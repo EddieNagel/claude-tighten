@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
-import type { ModelCompleteResult, Register } from 'claude-code'
+import type { EngineInterface, ModelCompleteResult, Register } from 'claude-code'
 
-import { afterCheck, armOnSubmit, buildCheckRequest, doneMeansOf, finishRequest, isTypedByPerson, parseVerdict, shouldCheck } from './check'
+import { afterCheck, armOnSubmit, buildCheckRequest, canRunCheck, doneMeansOf, finishRequest, isTypedByPerson, offerFor, parseVerdict, shouldOffer } from './check'
 import { buildRequest, parseReply, preview } from './tighten'
 
 const USE = 'Use tightened'
@@ -9,6 +9,7 @@ const MINE = 'Use mine'
 const checklist = atom({ plugin: 'tighten', key: 'checklist' } as const, null)
 const verdict = atom({ plugin: 'tighten', key: 'verdict' } as const, null)
 const isPersonsTurn = atom({ plugin: 'tighten', key: 'isPersonsTurn' } as const, false)
+const offer = atom({ plugin: 'tighten', key: 'offer' } as const, null)
 
 const MARK = { met: '✓', 'not met': '✗', 'not shown': '?', 'in progress': '…' } as const
 
@@ -34,6 +35,59 @@ function tokenNote(reply: ModelCompleteResult): string {
   const { all, cached } = tokensOf(reply)
 
   return all === 0 ? '' : ` (used ${Math.round(all / 1000)}k tokens, ${Math.round(cached / 1000)}k of them from cache)`
+}
+
+let isChecking = false
+
+async function runCheck($: EngineInterface): Promise<void> {
+  if (isChecking) {
+    $.ui.toast('tighten: a check is already running.')
+
+    return
+  }
+
+  isChecking = true
+
+  try {
+    const current = await read($, checklist)
+    const offered = await read($, offer)
+    await update($, offer, () => null)
+
+    if (!canRunCheck(current, offered)) {
+      $.ui.toast('tighten: this offer expired, so nothing was checked.')
+
+      return
+    }
+
+    $.ui.status('tighten: checking the work against "Done means"...')
+    const reply = await $.model.fork({ prompt: buildCheckRequest(current) })
+    const found = reply.isAnswered ? parseVerdict(reply.text, current, tokensOf(reply).all) : null
+    const latest = await read($, checklist)
+
+    if (latest === null || latest.doneMeans !== current.doneMeans) {
+      return
+    }
+
+    if (!reply.isAnswered && reply.reason === 'nothing-to-fork') {
+      $.ui.toast('tighten: there is no conversation to check, so nothing was spent.')
+
+      return
+    }
+
+    await update($, checklist, () => afterCheck(latest, found))
+
+    if (found === null) {
+      const why = !reply.isAnswered ? `the check did not run (${reply.reason})` : 'the check came back in the wrong shape'
+      $.ui.toast(`tighten: ${why}.`)
+    } else {
+      await update($, verdict, () => found)
+    }
+  } catch {
+    $.ui.toast('tighten: the check failed.')
+  } finally {
+    isChecking = false
+    $.ui.status(undefined)
+  }
 }
 
 export const register: Register = on => {
@@ -96,7 +150,7 @@ export const register: Register = on => {
 
     const doneMeans = doneMeansOf(text)
     await update($, checklist, () => (doneMeans === null ? null : { doneMeans, warnings: tightened.flags, isArmed: false, checksUsed: 0 }))
-    const check = doneMeans === null ? '' : ' When the reply ends, the work is checked against its "Done means" line.'
+    const check = doneMeans === null ? '' : ' When the reply ends, you can check the work against its "Done means" line.'
 
     return { text: `${choice === USE ? 'the tightened prompt' : 'your original'} is in your prompt box. Edit it if you like, then press Enter.${check}${tokenNote(reply)}` }
   })
@@ -113,16 +167,15 @@ export const register: Register = on => {
       }
 
       await update($, isPersonsTurn, () => isTypedByPerson(kind))
+    }
 
-      if (isTypedByPerson(kind)) {
-        await update($, verdict, () => null)
-      }
+    if (isTypedByPerson(e.origin.kind)) {
+      await update($, verdict, () => null)
+      await update($, offer, () => null)
     }
 
     return next(e)
   }).catch(($, e, next) => next(e))
-
-  let isChecking = false
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
@@ -130,33 +183,14 @@ export const register: Register = on => {
     try {
       const current = await read($, checklist)
 
-      if (isChecking || !shouldCheck(current, e.agentId, e.reason, await read($, isPersonsTurn)) || current === null) {
-        return done
-      }
-
-      isChecking = true
-      $.ui.status('tighten: checking the work against "Done means"...')
-      const reply = await $.model.fork({ prompt: buildCheckRequest(current) })
-      const found = reply.isAnswered ? parseVerdict(reply.text, current, tokensOf(reply).all) : null
-      const latest = await read($, checklist)
-
-      if (latest === null || latest.doneMeans !== current.doneMeans) {
-        return done
-      }
-
-      await update($, checklist, () => afterCheck(latest, found))
-
-      if (found === null) {
-        const why = !reply.isAnswered ? `the check did not run (${reply.reason})` : 'the check came back in the wrong shape'
-        $.ui.toast(`tighten: ${why}. It will not retry until you send the Done means line again.`)
-      } else {
-        await update($, verdict, () => found)
+      if (current !== null && shouldOffer(current, e.agentId, e.reason, await read($, isPersonsTurn))) {
+        const { context } = await $.session.usage()
+        const offered = offerFor(current, context.tokens ?? 0)
+        await update($, checklist, () => offered.checklist)
+        await update($, offer, () => offered.offer)
       }
     } catch {
-      $.ui.toast('tighten: the check failed. Your reply is unaffected.')
-    } finally {
-      isChecking = false
-      $.ui.status(undefined)
+      $.ui.toast('tighten: could not offer a check. Your reply is unaffected.')
     }
 
     return done
@@ -164,12 +198,33 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const found = await read($, verdict)
+    const offered = found === null ? await read($, offer) : null
 
-    if (e.props.hasSurvey || found === null) {
+    if (e.props.hasSurvey || (found === null && offered === null)) {
       return next(e)
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
+
+    if (found === null && offered !== null) {
+      const size = offered.tokens > 0 ? `about ${Math.round(offered.tokens / 1000)}k tokens` : 'this conversation'
+
+      return (
+        <Box flexDirection="column">
+          <Text>Check this work against its Done means line?</Text>
+          <Text dimColor>  It re-reads {size}. Cheap within a few minutes; full price after a long idle.</Text>
+          <Box>
+            <Button key="check" label="Check it" onPress={() => runCheck($)} />
+            <Text> </Text>
+            <Button key="skip" label="Skip" onPress={() => update($, offer, () => null)} />
+          </Box>
+        </Box>
+      )
+    }
+
+    if (found === null) {
+      return next(e)
+    }
     const canFinish = found.done === 'not met' || found.done === 'not shown'
     const color = found.done === 'met' ? 'green' : found.done === 'in progress' ? undefined : 'yellow'
 
@@ -187,7 +242,7 @@ export const register: Register = on => {
         {found.notes.map(note => (
           <Text>  Also: {note}</Text>
         ))}
-        {found.done === 'in progress' && <Text dimColor>  It will check once more after your next reply.</Text>}
+        {found.done === 'in progress' && <Text dimColor>  It will offer one more check after your next reply.</Text>}
         <Box>
           {canFinish && (
             <Button

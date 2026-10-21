@@ -1,4 +1,4 @@
-import type { Checklist, DoneStatus, Verdict, WarningStatus } from '../types'
+import type { Checklist, DoneStatus, Offer, Verdict, WarningStatus } from '../types'
 
 const TYPED_BY_PERSON = new Set(['composer', 'bridge', 'sdk'])
 const MAX_NOTES = 2
@@ -35,7 +35,7 @@ export function armOnSubmit(checklist: Checklist | null, text: string, originKin
   }
 }
 
-export function shouldCheck(checklist: Checklist | null, agentId: string | undefined, reason: string, isPersonsTurn: boolean): boolean {
+export function shouldOffer(checklist: Checklist | null, agentId: string | undefined, reason: string, isPersonsTurn: boolean): boolean {
   return (
     checklist !== null &&
     checklist.isArmed &&
@@ -44,6 +44,14 @@ export function shouldCheck(checklist: Checklist | null, agentId: string | undef
     reason === 'answer' &&
     isPersonsTurn
   )
+}
+
+export function offerFor(checklist: Checklist, contextTokens: number): { checklist: Checklist; offer: Offer } {
+  return { checklist: { ...checklist, isArmed: false }, offer: { doneMeans: checklist.doneMeans, tokens: contextTokens } }
+}
+
+export function canRunCheck(checklist: Checklist | null, offer: Offer | null): checklist is Checklist {
+  return checklist !== null && offer !== null && checklist.doneMeans === offer.doneMeans && checklist.checksUsed < MAX_CHECKS
 }
 
 export function afterCheck(checklist: Checklist, verdict: Verdict | null): Checklist | null {

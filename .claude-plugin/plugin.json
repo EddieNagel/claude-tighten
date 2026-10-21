@@ -1,6 +1,6 @@
 {
   "name": "tighten",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "/tighten rewrites your prompt so Claude can act on it, flags what you should know first, then checks the finished work against its Done means line",
   "author": { "name": "EddieNagel" },
   "license": "MIT",
