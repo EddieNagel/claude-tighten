@@ -36,7 +36,7 @@ Both passes re-read your conversation, mostly from Claude's prompt cache.
 At the prompt of a Claude Code terminal session:
 
 ```
-/plugin install tighten --marketplace Chexonbase/claude-tighten
+/plugin install tighten --marketplace EddieNagel/claude-tighten
 ```
 
 Answer `y` to add the marketplace, then pick a scope.
@@ -44,10 +44,10 @@ Answer `y` to add the marketplace, then pick a scope.
 From a shell:
 
 ```
-claude plugin install tighten --marketplace Chexonbase/claude-tighten
+claude plugin install tighten --marketplace EddieNagel/claude-tighten
 ```
 
-In the desktop app: click + next to the prompt box, then Plugins, then Add marketplace with `Chexonbase/claude-tighten`, then Add plugin.
+In the desktop app: click + next to the prompt box, then Plugins, then Add marketplace with `EddieNagel/claude-tighten`, then Add plugin.
 
 Mods need a Claude Code version recent enough to support them.
 
