@@ -31,6 +31,20 @@ Both passes re-read your conversation, mostly from Claude's prompt cache.
 - The after-check runs only on replies to prompts that carry a `Done means:` line you sent yourself. It runs once per send, at most 3 times per task. It never runs on helper agents, background notifications or scheduled runs.
 - Replies to prompts without a `Done means:` line cost nothing extra.
 
+Measured in one long session (about 300k tokens of conversation): `/tighten` used 302k tokens and the after-check 305k, almost all from cache. That is roughly $0.14 for both at Opus 5.5 prices, about the same as two extra messages in that session. In a fresh session, both together come to about $0.01 to $0.02.
+
+## Is it worth it?
+
+For bigger or vaguer tasks, usually yes. One reply that goes in the wrong direction in a long session costs more than $0.14. The gap-finding and the "not shown" check are what prevent that.
+
+For small tasks, no: on a one-line edit, the checks cost more than the work.
+
+## Ways to make it cheaper
+
+- Use `/tighten` on bigger tasks, not one-line edits.
+- Use it early in a session, while the conversation is still short.
+- Avoid running `/tighten` after the session has sat idle for a long time. The cache will have expired, and the whole conversation is re-read at the full input price.
+
 ## Install
 
 At the prompt of a Claude Code terminal session:
