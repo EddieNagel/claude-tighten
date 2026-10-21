@@ -1,0 +1,5 @@
+{
+  "name": "claude-tighten",
+  "owner": { "name": "Chexonbase" },
+  "plugins": [{ "name": "tighten", "source": "./" }]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "tighten",
+  "version": "0.2.0",
+  "description": "/tighten rewrites your prompt so Claude can act on it, flags what you should know first, then checks the finished work against its Done means line",
+  "author": { "name": "Chexonbase" },
+  "license": "MIT",
+  "repository": "https://github.com/Chexonbase/claude-tighten",
+  "types": "./types/index.d.ts"
+}
