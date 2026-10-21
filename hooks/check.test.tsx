@@ -127,6 +127,8 @@ test('end to end: nothing is spent until Check it is pressed', async ($, on) => 
   let ui = await band()
   expect((await ui.find({ type: 'Text', text: /Check this work/ }))?.text).toContain('Done means')
   expect((await ui.find({ type: 'Text', text: /re-reads/ }))?.text).toContain('about 301k tokens')
+  // Whatever the mods beneath draw stays in the band, under the offer.
+  expect((await ui.find({ type: 'Text', text: /engine/ }))?.text).toBe('engine')
   await ui.press({ key: 'skip' })
   await ui.unmount()
   ui = await band()

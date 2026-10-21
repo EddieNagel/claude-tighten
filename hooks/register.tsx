@@ -199,9 +199,11 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const found = await read($, verdict)
     const offered = found === null ? await read($, offer) : null
+    // The band holds one tree: keep the other mods' lines under this one.
+    const below = await next(e)
 
     if (e.props.hasSurvey || (found === null && offered === null)) {
-      return next(e)
+      return below
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
@@ -218,12 +220,13 @@ export const register: Register = on => {
             <Text> </Text>
             <Button key="skip" label="Skip" onPress={() => update($, offer, () => null)} />
           </Box>
+          {below}
         </Box>
       )
     }
 
     if (found === null) {
-      return next(e)
+      return below
     }
     const canFinish = found.done === 'not met' || found.done === 'not shown'
     const color = found.done === 'met' ? 'green' : found.done === 'in progress' ? undefined : 'yellow'
@@ -268,6 +271,7 @@ export const register: Register = on => {
           />
           <Text dimColor> check used {Math.round(found.tokens / 1000)}k tokens</Text>
         </Box>
+        {below}
       </Box>
     )
   })
