@@ -66,6 +66,30 @@ In the desktop app: click + next to the prompt box, then Plugins, then Add marke
 
 Mods need a Claude Code version recent enough to support them.
 
+## Codex
+
+A version for OpenAI Codex lives in `codex/tighten/SKILL.md`. It is a skill, not a mod, so the same two passes run but you answer in words instead of clicking:
+
+- `$tighten <your prompt>` shows the rewrite, the `Done means:` line and what you should know, then waits. Reply `go` to use it or `mine` to use yours.
+- When a task that carried a `Done means:` line finishes, the reply ends with a reminder that `$tighten check` is available. Type it to run the check. If the goal is not met, reply `finish`. Checks are manual and capped at 3 per task, as in Claude Code.
+
+What does not carry over: the Use tightened / Use mine buttons, the automatic Check this work? bar, and the token count after a check. Codex has no mod runtime for those.
+
+Install by copying the folder into your Codex skills directory:
+
+```
+git clone https://github.com/EddieNagel/claude-tighten
+cp -r claude-tighten/codex/tighten ~/.codex/skills/tighten
+```
+
+On Windows PowerShell:
+
+```
+Copy-Item -Recurse claude-tighten\codex\tighten $HOME\.codex\skills\tighten
+```
+
+Tested with codex-cli 0.155.1.
+
 ## Tests
 
 ```
